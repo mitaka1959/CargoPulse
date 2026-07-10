@@ -1,4 +1,5 @@
-﻿using System;
+﻿using CargoPulse.Fleet.Domain.Aggregates.VehicleAssigmentAggregates;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -11,29 +12,28 @@ namespace CargoPulse.Fleet.Domain.Aggregates.DriverAggregates
         public Guid Id { get; private set; }
         public string Name { get; private set; } = string.Empty;
         public string LicenseNumber { get; private set; } = string.Empty;
-        public string Status { get; private set; } = "Active";
+        public DriverStatus Status { get; private set; }
+        public Destination HomeBaseLocation { get; private set; } = null!;
         public bool IsDeleted { get; private set; } = false;
 
-        private Driver() { }
+        private Driver() { } 
 
-        public Driver(string name, string licenceNumber, string status)
+        public Driver(Guid id, string name, string licenseNumber, Destination homeBaseLocation)
         {
             if (string.IsNullOrWhiteSpace(name))
-                throw new ArgumentException("Name cannot be empty.", nameof(name));
-            if (string.IsNullOrWhiteSpace(licenceNumber))
-                throw new ArgumentException("Licence number cannot be empty.", nameof(licenceNumber));
-            
-            Id = Guid.NewGuid();
+                throw new ArgumentException("Driver name cannot be empty.", nameof(name));
+            if (string.IsNullOrWhiteSpace(licenseNumber))
+                throw new ArgumentException("License number cannot be empty.", nameof(licenseNumber));
+
+            Id = id;
             Name = name;
-            LicenseNumber = licenceNumber;
-            Status = status;
+            LicenseNumber = licenseNumber;
+            HomeBaseLocation = homeBaseLocation ?? throw new ArgumentNullException(nameof(homeBaseLocation));
         }
-    }
-    enum DriverStatus
-    {
-        Active,
-        Inactive,
-        OnVacation,
-        Suspended,
+
+        public void Delete()
+        {
+            IsDeleted = true;
+        }
     }
 }
