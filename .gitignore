@@ -1,0 +1,27 @@
+## User-specific files
+*.rsuser
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+
+## Build results
+[Dd]ebug/
+[Dd]ebugPublic/
+[Rr]elease/
+x64/
+x86/
+bbin/
+bin/
+obj/
+
+## Tooling & Containers
+.yaml-cache
+.dockerignore
+**/.env
+**/appsettings.Development.json
+
+## IDE configs
+.vs/
+.idea/
+*.userprefs

@@ -1,0 +1,6 @@
+<Solution>
+  <Project Path="CargoPulse.Fleet.API/CargoPulse.Fleet.API.csproj" />
+  <Project Path="CargoPulse.Fleet.Application/CargoPulse.Fleet.Application.csproj" />
+  <Project Path="CargoPulse.Fleet.Domain/CargoPulse.Fleet.Domain.csproj" />
+  <Project Path="CargoPulse.Fleet.Infrastructure/CargoPulse.Fleet.Infrastructure.csproj" />
+</Solution>

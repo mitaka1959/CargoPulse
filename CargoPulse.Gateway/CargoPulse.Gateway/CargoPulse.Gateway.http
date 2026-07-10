@@ -1,0 +1,6 @@
+@CargoPulse.Gateway_HostAddress = http://localhost:5135
+
+GET {{CargoPulse.Gateway_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
