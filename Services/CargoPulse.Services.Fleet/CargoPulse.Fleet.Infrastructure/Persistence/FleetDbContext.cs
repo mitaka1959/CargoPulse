@@ -1,12 +1,13 @@
-﻿using Microsoft.EntityFrameworkCore;
+﻿using CargoPulse.Fleet.Domain.Aggregates.DriverAggregates;
+using CargoPulse.Fleet.Domain.Aggregates.VehicleAggregates;
+using CargoPulse.Fleet.Domain.Aggregates.VehicleAssigmentAggregates;
+using CargoPulse.Fleet.Domain.HubAggregates;
+using Microsoft.EntityFrameworkCore;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
-using CargoPulse.Fleet.Domain.Aggregates.VehicleAggregates;
-using CargoPulse.Fleet.Domain.Aggregates.DriverAggregates;
-using CargoPulse.Fleet.Domain.Aggregates.VehicleAssigmentAggregates;
 
 
 namespace CargoPulse.Fleet.Infrastructure.Persistence;
@@ -16,6 +17,7 @@ public class FleetDbContext : DbContext
     public DbSet<Vehicle> Vehicles => Set<Vehicle>();
     public DbSet<Driver> Drivers => Set<Driver>();
     public DbSet<VehicleAssignment> VehicleAssignments => Set<VehicleAssignment>();
+    public DbSet<Hub> Hubs => Set<Hub>();
 
     public FleetDbContext(DbContextOptions<FleetDbContext> options) : base(options)
     {
@@ -64,7 +66,7 @@ public class FleetDbContext : DbContext
                 dest.Property(d => d.Longitude).HasColumnName("EndLongitude");
             });
 
-            // Relationships
+            
             entity.HasOne(va => va.Vehicle)
                   .WithMany()
                   .HasForeignKey(va => va.VehicleId)
@@ -79,6 +81,41 @@ public class FleetDbContext : DbContext
                   .HasConversion<string>()
                   .IsRequired()
                   .HasMaxLength(20);
+        });
+
+        modelBuilder.Entity<Hub>(entity =>
+        {
+            entity.ToTable("Hubs");
+            entity.HasKey(h => h.Id);
+            entity.Property(h => h.Name).IsRequired().HasMaxLength(100);
+            entity.Property(h => h.City).IsRequired().HasMaxLength(100);
+            entity.Property(h => h.Country).IsRequired().HasMaxLength(100);
+
+            // We do NOT map FreeSpaceCapacity or TotalCapacity because they are computed!
+            entity.Ignore(h => h.FreeSpaceCapacity);
+            entity.Ignore(h => h.TotalCapacity);
+
+            entity.HasQueryFilter(h => !h.IsDeleted);
+
+            // One-to-Many Relationship to Parking Spaces
+            entity.HasMany(h => h.ParkingSpaces)
+                  .WithOne()
+                  .HasForeignKey(p => p.HubId)
+                  .OnDelete(DeleteBehavior.Cascade); // If a Hub is destroyed, its spaces are destroyed
+        });
+
+        // Parking Space Mappings
+        modelBuilder.Entity<ParkingSpace>(entity =>
+        {
+            entity.ToTable("ParkingSpaces");
+            entity.HasKey(p => p.Id);
+            entity.Property(p => p.SpaceDesignation).IsRequired().HasMaxLength(50);
+
+            // Foreign Key to the Vehicle occupying it
+            entity.HasOne<Vehicle>()
+                  .WithMany()
+                  .HasForeignKey(p => p.OccupiedByVehicleId)
+                  .OnDelete(DeleteBehavior.SetNull); // If vehicle is deleted, space becomes empty
         });
     }
 }
