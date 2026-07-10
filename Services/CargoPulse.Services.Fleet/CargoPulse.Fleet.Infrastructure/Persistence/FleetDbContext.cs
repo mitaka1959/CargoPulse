@@ -1,4 +1,6 @@
-﻿using CargoPulse.Fleet.Domain.Aggregates.DriverAggregates;
+﻿using CargoPulse.Fleet.Domain.Aggregates.AssigmentAggregates;
+using CargoPulse.Fleet.Domain.Aggregates.DriverAggregates;
+using CargoPulse.Fleet.Domain.Aggregates.RouteAggregates;
 using CargoPulse.Fleet.Domain.Aggregates.VehicleAggregates;
 using CargoPulse.Fleet.Domain.Aggregates.VehicleAssigmentAggregates;
 using CargoPulse.Fleet.Domain.HubAggregates;
@@ -16,7 +18,7 @@ public class FleetDbContext : DbContext
 {
     public DbSet<Vehicle> Vehicles => Set<Vehicle>();
     public DbSet<Driver> Drivers => Set<Driver>();
-    public DbSet<VehicleAssignment> VehicleAssignments => Set<VehicleAssignment>();
+    public DbSet<Assignment> VehicleAssignments => Set<Assignment>();
     public DbSet<Hub> Hubs => Set<Hub>();
 
     public FleetDbContext(DbContextOptions<FleetDbContext> options) : base(options)
@@ -33,54 +35,99 @@ public class FleetDbContext : DbContext
             entity.ToTable("Vehicles");
             entity.HasKey(v => v.Id);
             entity.Property(v => v.LicensePlate).IsRequired().HasMaxLength(20);
-            entity.Property(v => v.Status).IsRequired().HasMaxLength(30);
+            entity.Property(v => v.Status).HasConversion<string>().IsRequired().HasMaxLength(20); 
             entity.Property(v => v.Type).IsRequired().HasMaxLength(50);
+
+            entity.HasQueryFilter(v => !v.IsDeleted); 
+
+            
+            entity.OwnsOne(v => v.CurrentLocation, loc =>
+            {
+                loc.Property(l => l.Latitude).HasColumnName("CurrentLatitude");
+                loc.Property(l => l.Longitude).HasColumnName("CurrentLongitude");
+                loc.Property(l => l.HubId).HasColumnName("CurrentHubId");
+            });
         });
 
-        // Driver Configuration
+        // Corrected Driver Configuration
         modelBuilder.Entity<Driver>(entity =>
         {
             entity.ToTable("Drivers");
             entity.HasKey(d => d.Id);
             entity.Property(d => d.Name).IsRequired().HasMaxLength(100);
             entity.Property(d => d.LicenseNumber).IsRequired().HasMaxLength(50);
-            entity.Property(d => d.Status).IsRequired().HasMaxLength(30);
-        });
+            entity.Property(d => d.Status).HasConversion<string>().IsRequired().HasMaxLength(20); 
 
-        // VehicleAssignment Configuration
-        modelBuilder.Entity<VehicleAssignment>(entity =>
-        {
-            entity.ToTable("VehicleAssignments");
-            entity.HasKey(va => va.Id);
-
-            // Mapping the Destination Value Object as Owned Types
-            entity.OwnsOne(va => va.StartAssigmentDestination, dest =>
-            {
-                dest.Property(d => d.Latitude).HasColumnName("StartLatitude");
-                dest.Property(d => d.Longitude).HasColumnName("StartLongitude");
-            });
-
-            entity.OwnsOne(va => va.EndAssigmentDestination, dest =>
-            {
-                dest.Property(d => d.Latitude).HasColumnName("EndLatitude");
-                dest.Property(d => d.Longitude).HasColumnName("EndLongitude");
-            });
+            entity.HasQueryFilter(d => !d.IsDeleted); 
 
             
-            entity.HasOne(va => va.Vehicle)
-                  .WithMany()
-                  .HasForeignKey(va => va.VehicleId)
-                  .OnDelete(DeleteBehavior.Restrict);
+            entity.OwnsOne(d => d.HomeBaseLocation, loc =>
+            {
+                loc.Property(l => l.Latitude).HasColumnName("HomeLatitude");
+                loc.Property(l => l.Longitude).HasColumnName("HomeLongitude");
+                loc.Property(l => l.HubId).HasColumnName("HomeHubId");
+            });
+        });
+      
+        modelBuilder.Entity<Route>(entity =>
+        {
+            entity.ToTable("Routes");
+            entity.HasKey(r => r.Id);
+            entity.Property(r => r.RouteName).IsRequired().HasMaxLength(150);
+            entity.HasQueryFilter(r => !r.IsDeleted);
 
-            entity.HasOne(va => va.Driver)
-                  .WithMany()
-                  .HasForeignKey(va => va.DriverId)
-                  .OnDelete(DeleteBehavior.Restrict);
+            entity.HasMany(r => r.Stops)
+                  .WithOne()
+                  .HasForeignKey(s => s.RouteId)
+                  .OnDelete(DeleteBehavior.Cascade);
+        });
 
-            entity.Property(va => va.Status)
-                  .HasConversion<string>()
-                  .IsRequired()
-                  .HasMaxLength(20);
+        // Route Stop Mappings
+        modelBuilder.Entity<RouteStop>(entity =>
+        {
+            entity.ToTable("RouteStops");
+            entity.HasKey(s => s.Id);
+            entity.Property(s => s.StopType).IsRequired().HasMaxLength(50);
+
+            entity.OwnsOne(s => s.Location, loc =>
+            {
+                loc.Property(l => l.Latitude).HasColumnName("Latitude");
+                loc.Property(l => l.Longitude).HasColumnName("Longitude");
+                loc.Property(l => l.HubId).HasColumnName("HubId");
+            });
+        });
+
+        // New Assignment Mappings (Replaces VehicleAssignments)
+        modelBuilder.Entity<Assignment>(entity =>
+        {
+            entity.ToTable("Assignments");
+            entity.HasKey(a => a.Id);
+            entity.Property(a => a.Status).HasConversion<string>().IsRequired().HasMaxLength(20);
+            entity.Property(a => a.CargoType).IsRequired().HasMaxLength(50);
+
+            entity.Ignore(a => a.ProgressPercentage); 
+
+            entity.HasOne(a => a.Vehicle).WithMany().HasForeignKey(a => a.VehicleId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(a => a.Driver).WithMany().HasForeignKey(a => a.DriverId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(a => a.Route).WithMany().HasForeignKey(a => a.RouteId).OnDelete(DeleteBehavior.Restrict);
+
+            entity.HasMany(a => a.Stops)
+                  .WithOne()
+                  .HasForeignKey(s => s.AssignmentId)
+                  .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        // Assignment Stop Mappings (Live Execution)
+        modelBuilder.Entity<AssignmentStop>(entity =>
+        {
+            entity.ToTable("AssignmentStops");
+            entity.HasKey(s => s.Id);
+            entity.Property(s => s.Status).HasConversion<string>().IsRequired().HasMaxLength(20);
+
+            entity.HasOne<RouteStop>()
+                  .WithMany()
+                  .HasForeignKey(s => s.RouteStopId)
+                  .OnDelete(DeleteBehavior.Restrict);
         });
 
         modelBuilder.Entity<Hub>(entity =>
@@ -91,7 +138,7 @@ public class FleetDbContext : DbContext
             entity.Property(h => h.City).IsRequired().HasMaxLength(100);
             entity.Property(h => h.Country).IsRequired().HasMaxLength(100);
 
-            // We do NOT map FreeSpaceCapacity or TotalCapacity because they are computed!
+            
             entity.Ignore(h => h.FreeSpaceCapacity);
             entity.Ignore(h => h.TotalCapacity);
 
@@ -101,7 +148,7 @@ public class FleetDbContext : DbContext
             entity.HasMany(h => h.ParkingSpaces)
                   .WithOne()
                   .HasForeignKey(p => p.HubId)
-                  .OnDelete(DeleteBehavior.Cascade); // If a Hub is destroyed, its spaces are destroyed
+                  .OnDelete(DeleteBehavior.Cascade);
         });
 
         // Parking Space Mappings

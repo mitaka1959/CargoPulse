@@ -38,12 +38,18 @@ namespace CargoPulse.Fleet.Domain.HubAggregates
             Longitude = longitude;
         }
 
-        public void AddParkingSpace(string spaceDesignation)
+        public void AddParkingSpace(string zone, int number)
         {
-            if (_parkingSpaces.Any(p => p.SpaceDesignation == spaceDesignation))
-                throw new InvalidOperationException("A parking space with this designation already exists.");
+            if (string.IsNullOrWhiteSpace(this.City) || this.City.Length < 3)
+                throw new InvalidOperationException("Hub must have a valid City/IATA code.");
 
-            _parkingSpaces.Add(new ParkingSpace(this.Id, spaceDesignation));
+            string cityCode = this.City.Substring(0, 3).ToUpper();
+            string designation = $"{cityCode}-{zone.ToUpper()}-{number:D2}";
+
+            if (_parkingSpaces.Any(p => p.SpaceDesignation == designation))
+                throw new InvalidOperationException($"Parking space {designation} already exists.");
+
+            _parkingSpaces.Add(new ParkingSpace(this.Id, designation));
         }
 
         public void Delete()
