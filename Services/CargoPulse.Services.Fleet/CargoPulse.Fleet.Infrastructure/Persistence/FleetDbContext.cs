@@ -1,9 +1,9 @@
 ﻿using CargoPulse.Fleet.Domain.Aggregates.AssigmentAggregates;
 using CargoPulse.Fleet.Domain.Aggregates.DriverAggregates;
+using CargoPulse.Fleet.Domain.Aggregates.HubAggregates;
 using CargoPulse.Fleet.Domain.Aggregates.RouteAggregates;
 using CargoPulse.Fleet.Domain.Aggregates.VehicleAggregates;
 using CargoPulse.Fleet.Domain.Aggregates.VehicleAssigmentAggregates;
-using CargoPulse.Fleet.Domain.HubAggregates;
 using Microsoft.EntityFrameworkCore;
 using System;
 using System.Collections.Generic;
@@ -18,7 +18,8 @@ public class FleetDbContext : DbContext
 {
     public DbSet<Vehicle> Vehicles => Set<Vehicle>();
     public DbSet<Driver> Drivers => Set<Driver>();
-    public DbSet<Assignment> VehicleAssignments => Set<Assignment>();
+    public DbSet<Route> Routes => Set<Route>();
+    public DbSet<Assignment> Assignments => Set<Assignment>();
     public DbSet<Hub> Hubs => Set<Hub>();
 
     public FleetDbContext(DbContextOptions<FleetDbContext> options) : base(options)
@@ -35,12 +36,12 @@ public class FleetDbContext : DbContext
             entity.ToTable("Vehicles");
             entity.HasKey(v => v.Id);
             entity.Property(v => v.LicensePlate).IsRequired().HasMaxLength(20);
-            entity.Property(v => v.Status).HasConversion<string>().IsRequired().HasMaxLength(20); 
-            entity.Property(v => v.Type).IsRequired().HasMaxLength(50);
+            entity.Property(v => v.Status).HasConversion<string>().IsRequired().HasMaxLength(20);
+            entity.Property(v => v.Type).HasConversion<string>().IsRequired().HasMaxLength(50);
 
-            entity.HasQueryFilter(v => !v.IsDeleted); 
+            entity.HasQueryFilter(v => !v.IsDeleted);
 
-            
+
             entity.OwnsOne(v => v.CurrentLocation, loc =>
             {
                 loc.Property(l => l.Latitude).HasColumnName("CurrentLatitude");
@@ -49,18 +50,17 @@ public class FleetDbContext : DbContext
             });
         });
 
-        // Corrected Driver Configuration
         modelBuilder.Entity<Driver>(entity =>
         {
             entity.ToTable("Drivers");
             entity.HasKey(d => d.Id);
             entity.Property(d => d.Name).IsRequired().HasMaxLength(100);
             entity.Property(d => d.LicenseNumber).IsRequired().HasMaxLength(50);
-            entity.Property(d => d.Status).HasConversion<string>().IsRequired().HasMaxLength(20); 
+            entity.Property(d => d.Status).HasConversion<string>().IsRequired().HasMaxLength(20);
 
-            entity.HasQueryFilter(d => !d.IsDeleted); 
+            entity.HasQueryFilter(d => !d.IsDeleted);
 
-            
+
             entity.OwnsOne(d => d.HomeBaseLocation, loc =>
             {
                 loc.Property(l => l.Latitude).HasColumnName("HomeLatitude");
@@ -68,7 +68,7 @@ public class FleetDbContext : DbContext
                 loc.Property(l => l.HubId).HasColumnName("HomeHubId");
             });
         });
-      
+
         modelBuilder.Entity<Route>(entity =>
         {
             entity.ToTable("Routes");
@@ -87,7 +87,7 @@ public class FleetDbContext : DbContext
         {
             entity.ToTable("RouteStops");
             entity.HasKey(s => s.Id);
-            entity.Property(s => s.StopType).IsRequired().HasMaxLength(50);
+            entity.Property(s => s.StopType).HasConversion<string>().IsRequired().HasMaxLength(50);
 
             entity.OwnsOne(s => s.Location, loc =>
             {
@@ -97,7 +97,7 @@ public class FleetDbContext : DbContext
             });
         });
 
-        // New Assignment Mappings (Replaces VehicleAssignments)
+        // Assignment Mappings 
         modelBuilder.Entity<Assignment>(entity =>
         {
             entity.ToTable("Assignments");
@@ -105,11 +105,11 @@ public class FleetDbContext : DbContext
             entity.Property(a => a.Status).HasConversion<string>().IsRequired().HasMaxLength(20);
             entity.Property(a => a.CargoType).IsRequired().HasMaxLength(50);
 
-            entity.Ignore(a => a.ProgressPercentage); 
+            entity.Ignore(a => a.ProgressPercentage);
 
-            entity.HasOne(a => a.Vehicle).WithMany().HasForeignKey(a => a.VehicleId).OnDelete(DeleteBehavior.Restrict);
-            entity.HasOne(a => a.Driver).WithMany().HasForeignKey(a => a.DriverId).OnDelete(DeleteBehavior.Restrict);
-            entity.HasOne(a => a.Route).WithMany().HasForeignKey(a => a.RouteId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<Vehicle>().WithMany().HasForeignKey(a => a.VehicleId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<Driver>().WithMany().HasForeignKey(a => a.DriverId).OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne<Route>().WithMany().HasForeignKey(a => a.RouteId).OnDelete(DeleteBehavior.Restrict);
 
             entity.HasMany(a => a.Stops)
                   .WithOne()
@@ -138,8 +138,6 @@ public class FleetDbContext : DbContext
             entity.Property(h => h.City).IsRequired().HasMaxLength(100);
             entity.Property(h => h.Country).IsRequired().HasMaxLength(100);
 
-            
-            entity.Ignore(h => h.FreeSpaceCapacity);
             entity.Ignore(h => h.TotalCapacity);
 
             entity.HasQueryFilter(h => !h.IsDeleted);
@@ -162,7 +160,7 @@ public class FleetDbContext : DbContext
             entity.HasOne<Vehicle>()
                   .WithMany()
                   .HasForeignKey(p => p.OccupiedByVehicleId)
-                  .OnDelete(DeleteBehavior.SetNull); // If vehicle is deleted, space becomes empty
+                  .OnDelete(DeleteBehavior.SetNull); 
         });
     }
 }

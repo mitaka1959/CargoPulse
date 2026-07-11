@@ -1,16 +1,16 @@
-﻿using System;
+﻿using CargoPulse.Fleet.Domain.Common;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace CargoPulse.Fleet.Domain.Aggregates.AssigmentAggregates
+namespace CargoPulse.Fleet.Domain.Aggregates.VehicleAssigmentAggregates
 {
-    public class AssignmentStop
+    public class AssignmentStop : Entity
     {
-        public Guid Id { get; private set; }
         public Guid AssignmentId { get; private set; }
-        public Guid RouteStopId { get; private set; } // Links back to the static Route Template
+        public Guid RouteStopId { get; private set; }
 
         // Live Execution Metrics
         public DateTime EstimatedArrivalTimeUtc { get; private set; }
@@ -25,6 +25,9 @@ namespace CargoPulse.Fleet.Domain.Aggregates.AssigmentAggregates
 
         internal AssignmentStop(Guid assignmentId, Guid routeStopId, DateTime eta, int scheduledStayDurationMinutes)
         {
+            if (scheduledStayDurationMinutes < 0)
+                throw new ArgumentException("Scheduled stay duration cannot be negative.", nameof(scheduledStayDurationMinutes));
+
             Id = Guid.NewGuid();
             AssignmentId = assignmentId;
             RouteStopId = routeStopId;
@@ -32,23 +35,27 @@ namespace CargoPulse.Fleet.Domain.Aggregates.AssigmentAggregates
             ScheduledStayDurationMinutes = scheduledStayDurationMinutes;
         }
 
-        // Domain Behaviors
-        public void MarkArrived(DateTime actualArrivalUtc)
+        internal void MarkArrived(DateTime actualArrivalUtc)
         {
-            if (Status != StopStatus.Pending) throw new InvalidOperationException("Stop is already processed.");
+            if (Status != StopStatus.Pending) throw new InvalidOperationException("Only a pending stop can be marked as arrived.");
             ActualArrivalTimeUtc = actualArrivalUtc;
             Status = StopStatus.Arrived;
         }
 
-        public void MarkDeparted(DateTime actualDepartureUtc)
+        internal void MarkDeparted(DateTime actualDepartureUtc)
         {
             if (Status != StopStatus.Arrived) throw new InvalidOperationException("Must arrive before departing.");
-            if (actualDepartureUtc < ActualArrivalTimeUtc) throw new ArgumentException("Cannot depart before arriving.");
+            if (actualDepartureUtc < ActualArrivalTimeUtc) throw new ArgumentException("Cannot depart before arriving.", nameof(actualDepartureUtc));
 
             ActualDepartureTimeUtc = actualDepartureUtc;
             Status = StopStatus.Completed;
         }
-    }
 
+        internal void MarkSkipped()
+        {
+            if (Status != StopStatus.Pending) throw new InvalidOperationException("Only a pending stop can be skipped.");
+            Status = StopStatus.Skipped;
+        }
+    }
     public enum StopStatus { Pending = 1, Arrived = 2, Completed = 3, Skipped = 4 }
 }

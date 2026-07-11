@@ -1,4 +1,5 @@
 ﻿using CargoPulse.Fleet.Domain.Aggregates.VehicleAssigmentAggregates;
+using CargoPulse.Fleet.Domain.Common;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -7,20 +8,18 @@ using System.Threading.Tasks;
 
 namespace CargoPulse.Fleet.Domain.Aggregates.VehicleAggregates
 {
-    public class Vehicle
+    public class Vehicle : AggregateRoot
     {
-        public Guid Id { get; private set; }
         public string LicensePlate { get; private set; } = string.Empty;
         public VehicleStatus Status { get; private set; } = VehicleStatus.Available;
-        public string Type { get; private set; } = "CargoTruck";
+        public VehicleType Type { get; private set; } = VehicleType.CargoTruck;
         public int MaxSpeedLimit { get; private set; }
         public double CapacityTonnage { get; private set; }
-        public Destination CurrentLocation { get; private set; } = null!;
-        public bool IsDeleted { get; private set; } = false;
+        public GeoLocation CurrentLocation { get; private set; } = null!;
 
-        private Vehicle() { } 
+        private Vehicle() { }
 
-        public Vehicle(Guid id, string licensePlate, string type, int maxSpeedLimit, double capacityTonnage, Destination currentLocation)
+        public Vehicle(Guid id, string licensePlate, VehicleType type, int maxSpeedLimit, double capacityTonnage, GeoLocation currentLocation)
         {
             if (string.IsNullOrWhiteSpace(licensePlate))
                 throw new ArgumentException("License plate cannot be empty.", nameof(licensePlate));
@@ -38,14 +37,6 @@ namespace CargoPulse.Fleet.Domain.Aggregates.VehicleAggregates
         }
 
         // State Transition Domain Behaviors
-        public void AssignToRoute()
-        {
-            if (Status == VehicleStatus.Maintenance)
-                throw new InvalidOperationException("Cannot assign a vehicle that is currently in maintenance.");
-
-            Status = VehicleStatus.OnAssignment;
-        }
-
         public void ReserveForUpcomingRoute()
         {
             if (Status != VehicleStatus.Available)
@@ -54,23 +45,48 @@ namespace CargoPulse.Fleet.Domain.Aggregates.VehicleAggregates
             Status = VehicleStatus.Reserved;
         }
 
-        public void CompleteRoute(Destination terminalLocation)
+        public void AssignToRoute()
         {
+            if (Status is not (VehicleStatus.Available or VehicleStatus.Reserved))
+                throw new InvalidOperationException($"Cannot assign a vehicle in status '{Status}'. It must be Available or Reserved.");
+
+            Status = VehicleStatus.OnAssignment;
+        }
+
+        public void CompleteRoute(GeoLocation terminalLocation)
+        {
+            if (Status != VehicleStatus.OnAssignment)
+                throw new InvalidOperationException("Only a vehicle that is currently on a route can complete it.");
+
             Status = VehicleStatus.Available;
-            CurrentLocation = terminalLocation;
+            CurrentLocation = terminalLocation ?? throw new ArgumentNullException(nameof(terminalLocation));
         }
 
         public void SendToMaintenance()
         {
             if (Status == VehicleStatus.OnAssignment)
                 throw new InvalidOperationException("Cannot send a vehicle to maintenance while it is actively on a highway route.");
+            if (Status == VehicleStatus.Retired)
+                throw new InvalidOperationException("A retired vehicle cannot be sent to maintenance.");
 
             Status = VehicleStatus.Maintenance;
         }
 
-        public void Delete()
+        public void ReturnToService()
         {
-            IsDeleted = true;
+            if (Status != VehicleStatus.Maintenance)
+                throw new InvalidOperationException("Only a vehicle currently in maintenance can be returned to service.");
+
+            Status = VehicleStatus.Available;
+        }
+
+        public void Retire()
+        {
+            if (Status == VehicleStatus.OnAssignment)
+                throw new InvalidOperationException("Cannot retire a vehicle while it is on assignment.");
+
+            Status = VehicleStatus.Retired;
+            Delete();
         }
     }
 }
