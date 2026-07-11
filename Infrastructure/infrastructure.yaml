@@ -21,7 +21,7 @@ spec:
             - name: POSTGRES_USER
               value: postgres
             - name: POSTGRES_PASSWORD
-              value: FleetSecure2026!
+              value: "PLACEHOLDER_LOCAL_DEVELOPMENT"
           ports:
             - containerPort: 5432
           volumeMounts:
