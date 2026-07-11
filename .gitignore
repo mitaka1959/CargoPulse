@@ -25,3 +25,6 @@ obj/
 .vs/
 .idea/
 *.userprefs
+
+# EF Core Design-Time Factories (Local development only)
+**/Persistence/FleetDbContextFactory.cs
