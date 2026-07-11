@@ -1,6 +1,7 @@
-﻿using CargoPulse.Fleet.Domain.Aggregates.VehicleAggregates;
+﻿using CargoPulse.Fleet.Domain.Aggregates.HubAggregates;
+using CargoPulse.Fleet.Domain.Aggregates.VehicleAggregates;
 using CargoPulse.Fleet.Domain.Aggregates.VehicleAssigmentAggregates;
-using CargoPulse.Fleet.Domain.HubAggregates;
+using CargoPulse.Fleet.Domain.Common;
 using Microsoft.Extensions.Logging;
 using System;
 using System.Collections.Generic;
@@ -76,13 +77,13 @@ namespace CargoPulse.Fleet.Infrastructure.Persistence.Seeder
             {
                 // Pick a random hub to spawn the truck at
                 var homeHub = hubs[random.Next(hubs.Count)];
-                var startLocation = new Destination(homeHub.Latitude, homeHub.Longitude, homeHub.Id);
+                var startLocation = new GeoLocation(homeHub.Latitude, homeHub.Longitude, homeHub.Id);
 
                 // Generate realistic logistics data
                 string licensePlate = $"{homeHub.City.Substring(0, 1).ToUpper()}-TR-{1000 + i}";
                 int speedLimit = 90; // Standard EU Truck Limit (km/h)
                 double tonnage = random.Next(15, 40); // Between 15 and 40 tons
-                string type = tonnage > 25 ? "HeavyFreight" : "StandardCargo";
+                VehicleType type = tonnage > 25 ? VehicleType.HeavyFreight : VehicleType.StandardCargo;
 
                 var truck = new Vehicle(Guid.NewGuid(), licensePlate, type, speedLimit, tonnage, startLocation);
 
